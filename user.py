@@ -18,7 +18,7 @@ class User(object):
         self.midEyeY = 100
         self.noseY = 200
         print('ll=',self.segment_list_length)
-    
+        self.age = 0
  
     def get_save_fn(self):
         imgName = '../%s/%s_%d'%(self.name, self.name, self.imgNr)
@@ -29,7 +29,6 @@ class User(object):
         """ implements simple fifo for each segment list """
         if len(self.segments[segment_index]) >= self.segment_list_length:
            del self.segments[segment_index][0]
-           print(self.segment_list_length)
         self.segments[segment_index].append(segment)
 
     def set_num_frames(self, num):
@@ -72,41 +71,43 @@ class MultiStripesUser(User):
             idx0 = random.randint(0,len(self.segments[0])-1)
             frames.append(self.segments[segment_idx][idx0])
         return frames
-    
+
 class FaceDetectionUser(User):
     """ derived user class for splitting the frame in eye, nose and mouth segments """
-    def __init__(self, num_frames=25*10):
+    def __init__(self, current_pos, num_frames=5*10):
         super(FaceDetectionUser, self).__init__(3, num_frames)
         self.midEyeY = 100
         self.noseY = 200
         self.width = 1920 /3
         self.index = 0
+        self.current_position = current_pos
+
     def set_num_segments(self, num):
         #not supported yet? fail silently
         pass
 
     
-    def cut_frame_to_segments(self, frame):
+    def cut_frame_to_segments(self, face):
         """ split frame in eye, nose and mouth segments """
-        faces_coordinates_list = find_faces(frame)
-        for face_coordinates in faces_coordinates_list:
-            self.midEyeY = face_coordinates[0]
-            self.noseY = face_coordinates[1]
-            frame_face = face_coordinates[2]
-            eye_segment = frame_face[0:self.midEyeY]
-            nose_segment = frame_face[self.midEyeY:self.midEyeY+self.noseY]
-            mouth_segment = frame_face[self.midEyeY+self.noseY:-1]
-            height = int(self.width*eye_segment.shape[0] / eye_segment.shape[1]) # h/w
-            eye_segment = cv2.resize(eye_segment, (self.width, height))
-            height = int(self.width*nose_segment.shape[0] / nose_segment.shape[1]) # h/w
-            nose_segment = cv2.resize(nose_segment, (self.width, height))
-            height = int(self.width*mouth_segment.shape[0] / mouth_segment.shape[1]) # h/w
+        self.midEyeY = face[0]
+        self.noseY = face[1]
+        frame_face = face[2]
+        self.current_position = face[3]
 
-            mouth_segment = cv2.resize(mouth_segment, (self.width, height))
+        eye_segment = frame_face[0:self.midEyeY]
+        nose_segment = frame_face[self.midEyeY:self.midEyeY+self.noseY]
+        mouth_segment = frame_face[self.midEyeY+self.noseY:-1]
+        height = int(self.width*eye_segment.shape[0] / eye_segment.shape[1]) # h/w
+        eye_segment = cv2.resize(eye_segment, (self.width, height))
+        height = int(self.width*nose_segment.shape[0] / nose_segment.shape[1]) # h/w
+        nose_segment = cv2.resize(nose_segment, (self.width, height))
+        height = int(self.width*mouth_segment.shape[0] / mouth_segment.shape[1]) # h/w
 
-            self._add_segment(0, eye_segment)
-            self._add_segment(1, nose_segment)
-            self._add_segment(2, mouth_segment)
+        mouth_segment = cv2.resize(mouth_segment, (self.width, height))
+
+        self._add_segment(0, eye_segment)
+        self._add_segment(1, nose_segment)
+        self._add_segment(2, mouth_segment)
 
 
     def get_segment_list(self, delta=5, alpha=0.8):
@@ -114,7 +115,7 @@ class FaceDetectionUser(User):
             with the overlay strength of alpha and height of delta
         """
         # get random segments
-        if len(self.segments[0]) < 100 :
+        if len(self.segments[0]) < 1 :
             return None
 
         self.index +=1
@@ -123,11 +124,11 @@ class FaceDetectionUser(User):
         idx2 = 0
         #ein bisschen komisches wechseln nacheinander, aber sieht schon lustig aus:
         if self.index >= len(self.segments[0]):
-            idx0 = len(self.segments[0]) - random.randint(1,10)*10
+            idx0 = len(self.segments[0]) - 1#random.randint(1,10)*0
             if self.index -len(self.segments[0]) >= len(self.segments[1]):
-                idx1 = len(self.segments[1]) -random.randint(1,10)*10  #change freeze frame!
+                idx1 = len(self.segments[1]) -1#random.randint(1,10)*0  #change freeze frame!
                 if self.index -len(self.segments[0]) - len(self.segments[1]) >=  len(self.segments[2]):
-                    idx2 = len(self.segments[2]) -random.randint(1,10)*10
+                    idx2 = len(self.segments[2]) -1#-random.randint(1,10)*0
                     self.index = 0
                 else:
                     idx2 = self.index -len(self.segments[0]) -len(self.segments[1])
@@ -138,15 +139,24 @@ class FaceDetectionUser(User):
             idx0 = self.index -1
         # get, blend and return the segments
         fr0 = self.segments[0][idx0]
-        fr0b = self.segments[0][idx1]
-        fr0[-delta:] = cv2.addWeighted(fr0[-delta:],alpha,fr0b[-delta:],1.0 - alpha,0.0)       
+        #fr0b = self.segments[0][idx1]
+        #fr0[-delta:] = cv2.addWeighted(fr0[-delta:],alpha,fr0b[-delta:],1.0 - alpha,0.0)
         fr1 = self.segments[1][idx1]
-        fr1b = self.segments[1][idx0]
-        fr1c = self.segments[1][idx2]
-        fr1[:delta] = cv2.addWeighted(fr1[:delta],alpha,fr1b[:delta],1.0 - alpha,0.0)
-        fr1[-delta:] = cv2.addWeighted(fr1[-delta:],alpha,fr1c[-delta:],1.0 - alpha,0.0)
+        #fr1b = self.segments[1][idx0]
+        #fr1c = self.segments[1][idx2]
+        #fr1[:delta] = cv2.addWeighted(fr1[:delta],alpha,fr1b[:delta],1.0 - alpha,0.0)
+        #fr1[-delta:] = cv2.addWeighted(fr1[-delta:],alpha,fr1c[-delta:],1.0 - alpha,0.0)
         fr2 = self.segments[2][idx2]
-        fr2b = self.segments[2][idx1]
-        fr2[:delta] = cv2.addWeighted(fr2[:delta],alpha,fr2b[:delta],1.0 - alpha,0.0)
+        #fr2b = self.segments[2][idx1]
+        #fr2[:delta] = cv2.addWeighted(fr2[:delta],alpha,fr2b[:delta],1.0 - alpha,0.0)
         
         return [fr0,fr1,fr2]
+
+
+    def get_segment(self, segement_idx, frame_idx):
+        if frame_idx: #and frame_idx < len(self.segments[segement_idx]):
+            idx = frame_idx % len(self.segments[segement_idx])
+            return self.segments[segement_idx][idx]
+        else: #live
+            return self.segments[segement_idx][-1]
+

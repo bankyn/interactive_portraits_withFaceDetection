@@ -11,7 +11,7 @@ def main():
     # initialize instance for the installation
     inst = Instance()
     while inst.is_running:
-        inst.create_user()
+        #inst.create_user()
         inst.run_session()
 
 if __name__ == "__main__":

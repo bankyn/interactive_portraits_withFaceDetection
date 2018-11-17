@@ -9,11 +9,11 @@ FACE_CASCADE = cv2.CascadeClassifier(os.path.join(CASCADE_DIR,
 EYE_CASCADE = cv2.CascadeClassifier(os.path.join(CASCADE_DIR,
                                      "haarcascade_eye.xml"))
 
-
+import numpy as np
 def find_faces(frame):
     """
         Finds faces, eyes and set nose coordinates in frame
-        returns list of faces [(y_coord_eyes, y_coord_nose),...]
+        returns list of faces [(y_coord_eyes, y_coord_nose, face_img, face_position),...]
     """
 
     faces = []
@@ -33,21 +33,21 @@ def find_faces(frame):
             midEyeY += ey + eh
 
         if len(eyes):
-            midEyeY = midEyeY / len(eyes)
+            midEyeY = int(midEyeY / len(eyes))
             midEyeY += b
             #midEyeY += y
         else:
             midEyeY = None
             continue
         
-        noseY = round(h/5)
+        noseY = int(h/5)
         if midEyeY:
             xn = x - b
             yn = y - b
             if xn < 0: xn = 0
             if yn < 0: yn = 0
             portrait = frame[yn:y+h+b,xn:x+w+b]
-            faces.append([midEyeY, noseY, portrait])
+            faces.append([midEyeY, noseY, portrait, np.array([xn,yn])])
 
     return faces
 
